@@ -61,6 +61,7 @@ async def delete_old_messages(chat_id, context: ContextTypes.DEFAULT_TYPE):
     await _delete_ids(chat_id, context, ids)
 
 
+
 async def show_page(
     chat_id,
     context: ContextTypes.DEFAULT_TYPE,
@@ -68,37 +69,42 @@ async def show_page(
     video_url=None,
     keyboard=None,
 ):
-    """Send a new page, then remove the previous one.
+    """Send video with caption or text-only page, then remove previous messages."""
 
-    The new page is sent first so a failed send never leaves the
-    user with an empty chat.
-    """
     old_ids = context.user_data.get(MENU_KEY, [])
-    new_ids = []
 
     if video_url:
         try:
-            video = await context.bot.send_video(
-                chat_id=chat_id, video=video_url
+            message = await context.bot.send_video(
+                chat_id=chat_id,
+                video=video_url,
+                caption=text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard,
             )
-            new_ids.append(video.message_id)
-        except TelegramError:
-            log.exception("Unable to send menu video")
 
-    try:
+        except TelegramError:
+            log.exception("Unable to send video with caption")
+
+            message = await context.bot.send_message(
+                chat_id=chat_id,
+                text=text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard,
+            )
+
+    else:
         message = await context.bot.send_message(
             chat_id=chat_id,
             text=text,
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard,
         )
-    except Exception:
-        await _delete_ids(chat_id, context, new_ids)
-        raise
 
-    new_ids.append(message.message_id)
-    context.user_data[MENU_KEY] = new_ids
+    context.user_data[MENU_KEY] = [message.message_id]
+
     await _delete_ids(chat_id, context, old_ids)
+
 
 
 async def show_photo_page(
